@@ -90,9 +90,18 @@ export function KakaoMap({ lat, lng, name, className }: KakaoMapProps) {
   }, [isLoaded, lat, lng, name]);
 
   if (error) {
+    const naverMapUrl = `https://map.naver.com/v5/search/${encodeURIComponent(name || '')}?c=${lng},${lat},15,0,0,0,dh`;
     return (
-      <div className={`flex items-center justify-center rounded-xl bg-neutral-100 text-sm text-neutral-500 ${className}`}>
-        {error}
+      <div className={`flex flex-col items-center justify-center gap-3 rounded-xl bg-neutral-100 text-sm text-neutral-500 ${className}`}>
+        <p>{error}</p>
+        <a
+          href={naverMapUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-primary-600 shadow-sm hover:bg-neutral-50 transition-colors"
+        >
+          네이버 지도에서 보기
+        </a>
       </div>
     );
   }

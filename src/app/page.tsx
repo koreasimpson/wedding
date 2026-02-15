@@ -96,7 +96,7 @@ export default function DashboardPage() {
                     <div className="min-w-0">
                       <p className="text-xs text-neutral-500">예산</p>
                       <p className="truncate text-sm font-semibold text-neutral-900">
-                        {preferences!.budget_min ? formatPriceEok(preferences!.budget_min) : '0'}
+                        {preferences!.budget_min ? formatPriceEok(preferences!.budget_min) : ''}
                         ~
                         {preferences!.budget_max ? formatPriceEok(preferences!.budget_max) : '제한없음'}
                       </p>
@@ -112,7 +112,7 @@ export default function DashboardPage() {
                     <div className="min-w-0">
                       <p className="text-xs text-neutral-500">면적</p>
                       <p className="truncate text-sm font-semibold text-neutral-900">
-                        {preferences!.area_min ? Math.round(preferences!.area_min / 3.3058) : 0}
+                        {preferences!.area_min ? `${Math.round(preferences!.area_min / 3.3058)}` : ''}
                         ~
                         {preferences!.area_max ? `${Math.round(preferences!.area_max / 3.3058)}평` : '제한없음'}
                       </p>

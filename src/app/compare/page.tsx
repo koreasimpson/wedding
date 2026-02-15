@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useCompareProperties } from '@/hooks/useCompareProperties';
 import { useAnalysis } from '@/hooks/useAnalysis';
-import { formatPrice, formatArea } from '@/lib/utils/format';
+import { formatPriceEok, formatArea } from '@/lib/utils/format';
 import { PROPERTY_TYPE_LABELS, PROPERTY_STATUS_LABELS, PROPERTY_STATUS_COLORS } from '@/types/property';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -37,7 +37,7 @@ function PropertyCompareColumn({ property, isHighlightPrice, isHighlightArea }: 
               <div>
                 <span className="text-xs text-neutral-500">가격</span>
                 <p className={`text-base font-bold ${isHighlightPrice ? 'text-green-600' : 'text-neutral-900'}`}>
-                  {formatPrice(property.asking_price)}
+                  {formatPriceEok(property.asking_price)}
                 </p>
               </div>
               <div>
@@ -72,7 +72,7 @@ function PropertyCompareColumn({ property, isHighlightPrice, isHighlightArea }: 
                 <div>
                   <span className="text-xs text-neutral-500">건축년도</span>
                   <p className="text-sm text-neutral-900">
-                    {property.built_year}년 (축 {new Date().getFullYear() - property.built_year}년)
+                    {property.built_year}년 (건축 {new Date().getFullYear() - property.built_year}년차)
                   </p>
                 </div>
               )}
@@ -80,7 +80,9 @@ function PropertyCompareColumn({ property, isHighlightPrice, isHighlightArea }: 
                 <div>
                   <span className="text-xs text-neutral-500">관리비</span>
                   <p className="text-sm text-neutral-900">
-                    {property.maintenance_fee.toLocaleString()}원
+                    {property.maintenance_fee >= 10000
+                      ? `${Math.round(property.maintenance_fee / 10000)}만원`
+                      : `${property.maintenance_fee.toLocaleString()}원`}
                   </p>
                 </div>
               )}
@@ -203,7 +205,7 @@ export default function ComparePage() {
                       {property.address}
                     </p>
                     <p className="text-sm font-bold text-primary-600 mt-1">
-                      {formatPrice(property.asking_price)}
+                      {formatPriceEok(property.asking_price)}
                     </p>
                   </div>
                 </label>
