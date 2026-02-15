@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Check, MapPin, Building2, Ruler, Layers, Calendar } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { X, Check, MapPin, Building2, Ruler, Layers, Calendar, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { usePreferences } from '@/hooks/usePreferences';
 
@@ -121,25 +122,172 @@ function Section({ icon: Icon, title, description, children }: {
   );
 }
 
+// 프리셋 Set에서 병합된 범위를 계산하는 헬퍼
+function mergeBudgetPresets(indices: Set<number>): { min: number | null; max: number | null } {
+  if (indices.size === 0) return { min: null, max: null };
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  let hasUnlimited = false;
+  indices.forEach(i => {
+    const p = BUDGET_PRESETS[i];
+    if (p.min < minVal) minVal = p.min;
+    if (p.max === 0) hasUnlimited = true;
+    else if (p.max > maxVal) maxVal = p.max;
+  });
+  return {
+    min: minVal === 0 ? null : minVal,
+    max: hasUnlimited ? null : (maxVal === -Infinity ? null : maxVal),
+  };
+}
+
+function mergeAreaPresets(indices: Set<number>): { minP: number | null; maxP: number | null } {
+  if (indices.size === 0) return { minP: null, maxP: null };
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  let hasUnlimited = false;
+  indices.forEach(i => {
+    const p = AREA_PRESETS[i];
+    if (p.minP < minVal) minVal = p.minP;
+    if (p.maxP === 0) hasUnlimited = true;
+    else if (p.maxP > maxVal) maxVal = p.maxP;
+  });
+  return {
+    minP: minVal === 0 ? null : minVal,
+    maxP: hasUnlimited ? null : (maxVal === -Infinity ? null : maxVal),
+  };
+}
+
+function mergeFloorPresets(indices: Set<number>): { min: number | null; max: number | null } {
+  if (indices.size === 0) return { min: null, max: null };
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  let hasUnlimited = false;
+  indices.forEach(i => {
+    const p = FLOOR_PRESETS[i];
+    if (p.min === null) return; // "상관없어요" 건너뜀
+    if (p.min < minVal) minVal = p.min;
+    if (p.max === null) hasUnlimited = true;
+    else if (p.max > maxVal) maxVal = p.max;
+  });
+  if (minVal === Infinity) return { min: null, max: null };
+  return {
+    min: minVal,
+    max: hasUnlimited ? null : (maxVal === -Infinity ? null : maxVal),
+  };
+}
+
+function mergeBuiltYearPresets(indices: Set<number>): number | null {
+  if (indices.size === 0) return null;
+  let minYear = Infinity;
+  indices.forEach(i => {
+    const p = BUILT_YEAR_PRESETS[i];
+    if (p.value === null) return;
+    if (p.value < minYear) minYear = p.value;
+  });
+  return minYear === Infinity ? null : minYear;
+}
+
+// 저장된 값으로부터 프리셋 Set 역추적
+function restoreBudgetPresets(budgetMinEok: number | null, budgetMaxEok: number | null): Set<number> {
+  const set = new Set<number>();
+  const sMin = budgetMinEok ?? 0;
+  const sMax = budgetMaxEok;
+
+  BUDGET_PRESETS.forEach((p, i) => {
+    const pMin = p.min;
+    const pMax = p.max === 0 ? null : p.max; // 0 = unlimited
+    if (pMin >= sMin && (sMax === null || (pMax !== null && pMax <= sMax))) {
+      set.add(i);
+    }
+  });
+
+  // 검증: 병합 결과가 원래 값과 일치하는지
+  const merged = mergeBudgetPresets(set);
+  const mergedMin = merged.min ?? 0;
+  const mergedMax = merged.max;
+  if (mergedMin !== sMin || mergedMax !== sMax) {
+    return new Set(); // 일치하지 않으면 빈 Set (직접 입력 모드)
+  }
+  return set;
+}
+
+function restoreAreaPresets(areaMinP: number | null, areaMaxP: number | null): Set<number> {
+  const set = new Set<number>();
+  const sMinP = areaMinP ?? 0;
+  const sMaxP = areaMaxP;
+
+  AREA_PRESETS.forEach((p, i) => {
+    const pMinP = p.minP;
+    const pMaxP = p.maxP === 0 ? null : p.maxP;
+    if (pMinP >= sMinP && (sMaxP === null || (pMaxP !== null && pMaxP <= sMaxP))) {
+      set.add(i);
+    }
+  });
+
+  const merged = mergeAreaPresets(set);
+  const mergedMinP = merged.minP ?? 0;
+  const mergedMaxP = merged.maxP;
+  if (mergedMinP !== sMinP || mergedMaxP !== sMaxP) {
+    return new Set();
+  }
+  return set;
+}
+
+function restoreFloorPresets(floorMin: number | null, floorMax: number | null): Set<number> {
+  if (floorMin === null && floorMax === null) return new Set();
+  const set = new Set<number>();
+
+  FLOOR_PRESETS.forEach((p, i) => {
+    if (p.min === null) return; // "상관없어요" 건너뜀
+    if (p.min >= (floorMin ?? 1)) {
+      if (floorMax === null || (p.max !== null && p.max <= floorMax) || p.max === null) {
+        set.add(i);
+      }
+    }
+  });
+
+  const merged = mergeFloorPresets(set);
+  if (merged.min !== floorMin || merged.max !== floorMax) {
+    return new Set();
+  }
+  return set;
+}
+
+function restoreBuiltYearPresets(minBuiltYear: number | null): Set<number> {
+  if (minBuiltYear === null) return new Set();
+  const set = new Set<number>();
+  BUILT_YEAR_PRESETS.forEach((p, i) => {
+    if (p.value === minBuiltYear) {
+      set.add(i);
+    }
+  });
+  return set;
+}
+
 export default function SettingsPage() {
+  const router = useRouter();
   const { data: preferences, isLoading, upsert, isUpserting } = usePreferences();
 
   // 예산 (억 단위)
   const [budgetMin, setBudgetMin] = useState<number | null>(null);
   const [budgetMax, setBudgetMax] = useState<number | null>(null);
   const [budgetCustom, setBudgetCustom] = useState(false);
+  const [selectedBudgetPresets, setSelectedBudgetPresets] = useState<Set<number>>(new Set());
 
   // 면적 (평 단위)
   const [areaMinP, setAreaMinP] = useState<number | null>(null);
   const [areaMaxP, setAreaMaxP] = useState<number | null>(null);
   const [areaCustom, setAreaCustom] = useState(false);
+  const [selectedAreaPresets, setSelectedAreaPresets] = useState<Set<number>>(new Set());
 
   // 층수
   const [floorMin, setFloorMin] = useState<number | null>(null);
   const [floorMax, setFloorMax] = useState<number | null>(null);
+  const [selectedFloorPresets, setSelectedFloorPresets] = useState<Set<number>>(new Set());
 
   // 건축년도
   const [minBuiltYear, setMinBuiltYear] = useState<number | null>(null);
+  const [selectedBuiltYearPresets, setSelectedBuiltYearPresets] = useState<Set<number>>(new Set());
 
   // 지역
   const [preferredRegions, setPreferredRegions] = useState<string[]>([]);
@@ -150,82 +298,146 @@ export default function SettingsPage() {
   // 기존 조건 로드
   useEffect(() => {
     if (preferences) {
-      if (preferences.budget_min) setBudgetMin(toEok(preferences.budget_min));
-      if (preferences.budget_max) setBudgetMax(toEok(preferences.budget_max));
-      if (preferences.area_min) setAreaMinP(sqmToPyeong(preferences.area_min));
-      if (preferences.area_max) setAreaMaxP(sqmToPyeong(preferences.area_max));
+      const bMinEok = preferences.budget_min ? toEok(preferences.budget_min) : null;
+      const bMaxEok = preferences.budget_max ? toEok(preferences.budget_max) : null;
+      if (bMinEok != null) setBudgetMin(bMinEok);
+      if (bMaxEok != null) setBudgetMax(bMaxEok);
+
+      const aMinP = preferences.area_min ? sqmToPyeong(preferences.area_min) : null;
+      const aMaxP = preferences.area_max ? sqmToPyeong(preferences.area_max) : null;
+      if (aMinP != null) setAreaMinP(aMinP);
+      if (aMaxP != null) setAreaMaxP(aMaxP);
+
       if (preferences.min_floor != null) setFloorMin(preferences.min_floor);
       if (preferences.max_floor != null) setFloorMax(preferences.max_floor);
       if (preferences.min_built_year) setMinBuiltYear(preferences.min_built_year);
       setPreferredRegions(preferences.preferred_regions || []);
 
-      // 프리셋에 안 맞으면 직접 입력 모드
-      const budgetMinEok = preferences.budget_min ? toEok(preferences.budget_min) : null;
-      const budgetMaxEok = preferences.budget_max ? toEok(preferences.budget_max) : null;
-      const matchesBudget = BUDGET_PRESETS.some(p =>
-        (p.min === (budgetMinEok ?? 0)) && (p.max === (budgetMaxEok ?? 0))
-      );
-      if (!matchesBudget && (budgetMinEok || budgetMaxEok)) setBudgetCustom(true);
+      // 프리셋 역추적
+      const restoredBudget = restoreBudgetPresets(bMinEok, bMaxEok);
+      if (restoredBudget.size > 0) {
+        setSelectedBudgetPresets(restoredBudget);
+      } else if (bMinEok || bMaxEok) {
+        setBudgetCustom(true);
+      }
 
-      const areaMinPyeong = preferences.area_min ? sqmToPyeong(preferences.area_min) : null;
-      const areaMaxPyeong = preferences.area_max ? sqmToPyeong(preferences.area_max) : null;
-      const matchesArea = AREA_PRESETS.some(p =>
-        (p.minP === (areaMinPyeong ?? 0)) && (p.maxP === (areaMaxPyeong ?? 0))
-      );
-      if (!matchesArea && (areaMinPyeong || areaMaxPyeong)) setAreaCustom(true);
+      const restoredArea = restoreAreaPresets(aMinP, aMaxP);
+      if (restoredArea.size > 0) {
+        setSelectedAreaPresets(restoredArea);
+      } else if (aMinP || aMaxP) {
+        setAreaCustom(true);
+      }
+
+      const restoredFloor = restoreFloorPresets(preferences.min_floor ?? null, preferences.max_floor ?? null);
+      setSelectedFloorPresets(restoredFloor);
+
+      const restoredBuiltYear = restoreBuiltYearPresets(preferences.min_built_year ?? null);
+      setSelectedBuiltYearPresets(restoredBuiltYear);
     }
   }, [preferences]);
 
-  // 예산 프리셋 선택
-  const handleBudgetPreset = (preset: typeof BUDGET_PRESETS[0]) => {
-    const isSelected = budgetMin === preset.min && budgetMax === preset.max;
-    if (isSelected) {
-      setBudgetMin(null);
-      setBudgetMax(null);
-    } else {
-      setBudgetMin(preset.min);
-      setBudgetMax(preset.max);
+  // 예산 프리셋 다중 선택
+  const handleBudgetPreset = (index: number) => {
+    setSelectedBudgetPresets(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      const merged = mergeBudgetPresets(next);
+      setBudgetMin(merged.min);
+      setBudgetMax(merged.max);
       setBudgetCustom(false);
-    }
+      return next;
+    });
   };
 
-  const isBudgetPresetSelected = (preset: typeof BUDGET_PRESETS[0]) =>
-    budgetMin === preset.min && budgetMax === preset.max;
+  const isBudgetPresetSelected = (index: number) => selectedBudgetPresets.has(index);
 
-  // 면적 프리셋 선택
-  const handleAreaPreset = (preset: typeof AREA_PRESETS[0]) => {
-    const isSelected = areaMinP === preset.minP && areaMaxP === preset.maxP;
-    if (isSelected) {
-      setAreaMinP(null);
-      setAreaMaxP(null);
-    } else {
-      setAreaMinP(preset.minP);
-      setAreaMaxP(preset.maxP);
+  // 면적 프리셋 다중 선택
+  const handleAreaPreset = (index: number) => {
+    setSelectedAreaPresets(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      const merged = mergeAreaPresets(next);
+      setAreaMinP(merged.minP);
+      setAreaMaxP(merged.maxP);
       setAreaCustom(false);
-    }
+      return next;
+    });
   };
 
-  const isAreaPresetSelected = (preset: typeof AREA_PRESETS[0]) =>
-    areaMinP === preset.minP && areaMaxP === preset.maxP;
+  const isAreaPresetSelected = (index: number) => selectedAreaPresets.has(index);
 
-  // 층수 프리셋 선택
-  const handleFloorPreset = (preset: typeof FLOOR_PRESETS[0]) => {
-    const isSelected = floorMin === preset.min && floorMax === preset.max;
-    if (isSelected) {
+  // 층수 프리셋 다중 선택
+  const handleFloorPreset = (index: number) => {
+    const preset = FLOOR_PRESETS[index];
+
+    // "상관없어요" 선택 시 전체 해제
+    if (preset.min === null && preset.max === null) {
+      setSelectedFloorPresets(new Set());
       setFloorMin(null);
       setFloorMax(null);
-    } else {
-      setFloorMin(preset.min);
-      setFloorMax(preset.max);
+      return;
     }
+
+    setSelectedFloorPresets(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      const merged = mergeFloorPresets(next);
+      setFloorMin(merged.min);
+      setFloorMax(merged.max);
+      return next;
+    });
   };
 
-  const isFloorPresetSelected = (preset: typeof FLOOR_PRESETS[0]) =>
-    floorMin === preset.min && floorMax === preset.max;
+  const isFloorPresetSelected = (index: number) => {
+    const preset = FLOOR_PRESETS[index];
+    if (preset.min === null && preset.max === null) {
+      return selectedFloorPresets.size === 0 && floorMin === null && floorMax === null;
+    }
+    return selectedFloorPresets.has(index);
+  };
 
-  // 건축년도 프리셋 선택
-  const handleBuiltYearPreset = (preset: typeof BUILT_YEAR_PRESETS[0]) => {
-    setMinBuiltYear(minBuiltYear === preset.value ? null : preset.value);
+  // 건축년도 프리셋 다중 선택
+  const handleBuiltYearPreset = (index: number) => {
+    const preset = BUILT_YEAR_PRESETS[index];
+
+    // "상관없어요" 선택 시 전체 해제
+    if (preset.value === null) {
+      setSelectedBuiltYearPresets(new Set());
+      setMinBuiltYear(null);
+      return;
+    }
+
+    setSelectedBuiltYearPresets(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      const merged = mergeBuiltYearPresets(next);
+      setMinBuiltYear(merged);
+      return next;
+    });
+  };
+
+  const isBuiltYearPresetSelected = (index: number) => {
+    const preset = BUILT_YEAR_PRESETS[index];
+    if (preset.value === null) {
+      return selectedBuiltYearPresets.size === 0 && minBuiltYear === null;
+    }
+    return selectedBuiltYearPresets.has(index);
   };
 
   // 지역 추가
@@ -264,6 +476,7 @@ export default function SettingsPage() {
         onSuccess: () => {
           setShowToast(true);
           setTimeout(() => setShowToast(false), 3000);
+          router.push('/search?fromPreferences=true');
         },
       }
     );
@@ -274,12 +487,16 @@ export default function SettingsPage() {
     setBudgetMin(null);
     setBudgetMax(null);
     setBudgetCustom(false);
+    setSelectedBudgetPresets(new Set());
     setAreaMinP(null);
     setAreaMaxP(null);
     setAreaCustom(false);
+    setSelectedAreaPresets(new Set());
     setFloorMin(null);
     setFloorMax(null);
+    setSelectedFloorPresets(new Set());
     setMinBuiltYear(null);
+    setSelectedBuiltYearPresets(new Set());
     setPreferredRegions([]);
     setRegionInput('');
   };
@@ -295,6 +512,15 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="mx-auto max-w-2xl p-5 md:p-8">
+        {/* 뒤로가기 */}
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          뒤로가기
+        </button>
+
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-neutral-900">어떤 집을 찾고 있나요?</h1>
           <p className="mt-1.5 text-neutral-500">
@@ -307,14 +533,14 @@ export default function SettingsPage() {
           <Section
             icon={Building2}
             title="예산"
-            description="어느 정도 금액을 생각하고 계세요?"
+            description="어느 정도 금액을 생각하고 계세요? (여러 개 선택 가능)"
           >
             <div className="flex flex-wrap gap-2">
-              {BUDGET_PRESETS.map((preset) => (
+              {BUDGET_PRESETS.map((preset, index) => (
                 <Chip
                   key={preset.label}
-                  selected={isBudgetPresetSelected(preset)}
-                  onClick={() => handleBudgetPreset(preset)}
+                  selected={isBudgetPresetSelected(index)}
+                  onClick={() => handleBudgetPreset(index)}
                 >
                   {preset.label}
                 </Chip>
@@ -324,7 +550,7 @@ export default function SettingsPage() {
                 onClick={() => {
                   setBudgetCustom(!budgetCustom);
                   if (!budgetCustom) {
-                    // 프리셋 해제
+                    setSelectedBudgetPresets(new Set());
                     setBudgetMin(null);
                     setBudgetMax(null);
                   }
@@ -371,14 +597,14 @@ export default function SettingsPage() {
           <Section
             icon={Ruler}
             title="전용면적"
-            description="원하는 평수를 골라주세요"
+            description="원하는 평수를 골라주세요 (여러 개 선택 가능)"
           >
             <div className="flex flex-wrap gap-2">
-              {AREA_PRESETS.map((preset) => (
+              {AREA_PRESETS.map((preset, index) => (
                 <Chip
                   key={preset.label}
-                  selected={isAreaPresetSelected(preset)}
-                  onClick={() => handleAreaPreset(preset)}
+                  selected={isAreaPresetSelected(index)}
+                  onClick={() => handleAreaPreset(index)}
                   description={preset.desc}
                 >
                   {preset.label}
@@ -389,6 +615,7 @@ export default function SettingsPage() {
                 onClick={() => {
                   setAreaCustom(!areaCustom);
                   if (!areaCustom) {
+                    setSelectedAreaPresets(new Set());
                     setAreaMinP(null);
                     setAreaMaxP(null);
                   }
@@ -435,14 +662,14 @@ export default function SettingsPage() {
           <Section
             icon={Layers}
             title="층수"
-            description="선호하는 층수가 있으세요?"
+            description="선호하는 층수가 있으세요? (여러 개 선택 가능)"
           >
             <div className="flex flex-wrap gap-2">
-              {FLOOR_PRESETS.map((preset) => (
+              {FLOOR_PRESETS.map((preset, index) => (
                 <Chip
                   key={preset.label}
-                  selected={isFloorPresetSelected(preset)}
-                  onClick={() => handleFloorPreset(preset)}
+                  selected={isFloorPresetSelected(index)}
+                  onClick={() => handleFloorPreset(index)}
                   description={preset.desc}
                 >
                   {preset.label}
@@ -455,14 +682,14 @@ export default function SettingsPage() {
           <Section
             icon={Calendar}
             title="건물 연식"
-            description="연식이 오래된 건물도 괜찮으세요?"
+            description="연식이 오래된 건물도 괜찮으세요? (여러 개 선택 가능)"
           >
             <div className="flex flex-wrap gap-2">
-              {BUILT_YEAR_PRESETS.map((preset) => (
+              {BUILT_YEAR_PRESETS.map((preset, index) => (
                 <Chip
                   key={preset.label}
-                  selected={minBuiltYear === preset.value}
-                  onClick={() => handleBuiltYearPreset(preset)}
+                  selected={isBuiltYearPresetSelected(index)}
+                  onClick={() => handleBuiltYearPreset(index)}
                   description={preset.desc}
                 >
                   {preset.label}

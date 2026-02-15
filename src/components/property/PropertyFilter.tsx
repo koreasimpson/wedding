@@ -27,6 +27,13 @@ export function PropertyFilter() {
   const propertyTypes: PropertyType[] = ['apt', 'villa', 'officetel', 'house'];
   const propertyStatuses: PropertyStatus[] = ['none', 'interested', 'visit_planned', 'visited', 'candidate', 'rejected'];
 
+  // 필터가 적용되어 있는지 확인
+  const hasActiveFilters = !!(
+    filters.type || filters.priceMin || filters.priceMax ||
+    filters.areaMin || filters.areaMax || filters.floorMin || filters.floorMax ||
+    filters.rooms || filters.builtYearFrom || filters.region || filters.status
+  );
+
   const handleReset = () => {
     setFilters({
       type: null,
@@ -72,12 +79,32 @@ export function PropertyFilter() {
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors"
       >
-        <span className="text-sm font-semibold text-neutral-900">필터 옵션</span>
-        {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-neutral-500" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-neutral-500" />
-        )}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-neutral-900">필터 옵션</span>
+          {hasActiveFilters && (
+            <span className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
+              내 조건 적용됨
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {hasActiveFilters && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReset();
+              }}
+              className="text-xs text-neutral-500 hover:text-neutral-700 underline"
+            >
+              초기화
+            </button>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4 text-neutral-500" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-neutral-500" />
+          )}
+        </div>
       </button>
 
       {isExpanded && (

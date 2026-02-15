@@ -7,6 +7,7 @@ import { ScoreBadge } from '@/components/analysis/ScoreBadge';
 import { formatPriceEok, formatArea } from '@/lib/utils/format';
 import { PROPERTY_TYPE_LABELS, PROPERTY_STATUS_LABELS } from '@/types/property';
 import { useFavorites } from '@/hooks/useFavorites';
+import { MessageSquare, MapPin } from 'lucide-react';
 import type { Property, PropertyStatus } from '@/types/property';
 import type { AnalysisReport } from '@/types/analysis';
 
@@ -60,6 +61,20 @@ export function PropertyCard({ property, reports, showStatusSelect = false }: Pr
             {property.direction && ` · ${property.direction}`}
             {property.built_year && ` · ${property.built_year}년`}
           </p>
+
+          {property.memo && (
+            <div className="mt-2 flex items-start gap-1.5">
+              <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
+              <p className="line-clamp-2 text-xs text-neutral-500">{property.memo}</p>
+            </div>
+          )}
+
+          {property.visit_memo && (
+            <div className="mt-1.5 flex items-start gap-1.5">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+              <p className="line-clamp-1 text-xs text-amber-700">{property.visit_memo}</p>
+            </div>
+          )}
 
           {reports && reports.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">

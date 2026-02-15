@@ -1,6 +1,7 @@
 'use client';
 
 import { use } from 'react';
+import { useRouter } from 'next/navigation';
 import { useProperty } from '@/hooks/useProperty';
 import { usePropertyNews } from '@/hooks/usePropertyNews';
 import { usePropertyReviews } from '@/hooks/usePropertyReviews';
@@ -16,7 +17,8 @@ import { Button } from '@/components/ui/Button';
 import { AnalysisRadar } from '@/components/analysis/AnalysisRadar';
 import { AnalysisSection } from '@/components/analysis/AnalysisSection';
 import { ScoreBadge } from '@/components/analysis/ScoreBadge';
-import { ExternalLink, Loader2, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
+import { KakaoMap } from '@/components/map/KakaoMap';
+import { ExternalLink, Loader2, RefreshCw, Sparkles, CheckCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +26,7 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { data: property, isLoading: propertyLoading, error: propertyError } = useProperty(id);
   const { data: news = [], isLoading: newsLoading } = usePropertyNews(id);
   const { data: reviews = [], isLoading: reviewsLoading } = usePropertyReviews(id);
@@ -34,6 +37,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const supabase = createClient();
 
   const [memo, setMemo] = useState('');
+  const [visitMemo, setVisitMemo] = useState('');
+  const [memoTab, setMemoTab] = useState<'memo' | 'visit'>('memo');
   const [memoSaved, setMemoSaved] = useState(false);
   const [isAnalysisProcessing, setIsAnalysisProcessing] = useState(false);
 
@@ -75,6 +80,9 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   if (property && memo === '' && property.memo) {
     setMemo(property.memo);
   }
+  if (property && visitMemo === '' && property.visit_memo) {
+    setVisitMemo(property.visit_memo);
+  }
 
   const handleStatusChange = async (status: PropertyStatus) => {
     if (!property) return;
@@ -89,7 +97,11 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const handleMemoSave = async () => {
     if (!property) return;
     try {
-      await updateProperty.mutateAsync({ id: property.id, memo });
+      if (memoTab === 'memo') {
+        await updateProperty.mutateAsync({ id: property.id, memo });
+      } else {
+        await updateProperty.mutateAsync({ id: property.id, visit_memo: visitMemo });
+      }
       setMemoSaved(true);
       setTimeout(() => setMemoSaved(false), 2000);
     } catch (error) {
@@ -175,6 +187,15 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
+        {/* 뒤로가기 */}
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          뒤로가기
+        </button>
+
         {/* 상단 헤더 */}
         <Card>
           <CardHeader>
@@ -243,18 +264,48 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           </CardContent>
         </Card>
 
-        {/* 메모 섹션 */}
+        {/* 메모 섹션 (탭 UI) */}
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-bold text-neutral-900">메모</h2>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setMemoTab('memo')}
+                className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+                  memoTab === 'memo'
+                    ? 'bg-primary-50 text-primary-700'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                메모
+              </button>
+              <button
+                onClick={() => setMemoTab('visit')}
+                className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+                  memoTab === 'visit'
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                방문 메모
+              </button>
+            </div>
           </CardHeader>
           <CardContent>
-            <textarea
-              className="w-full min-h-[120px] p-3 border border-neutral-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              placeholder="이 매물에 대한 메모를 작성하세요..."
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-            />
+            {memoTab === 'memo' ? (
+              <textarea
+                className="w-full min-h-[120px] p-3 border border-neutral-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="이 매물에 대한 메모를 작성하세요..."
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+              />
+            ) : (
+              <textarea
+                className="w-full min-h-[120px] p-3 border border-amber-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="방문 후 느낀 점, 체크리스트 등을 기록하세요..."
+                value={visitMemo}
+                onChange={(e) => setVisitMemo(e.target.value)}
+              />
+            )}
             <div className="mt-3 flex items-center justify-between">
               <span className="text-xs text-neutral-400">
                 {memoSaved && '저장되었습니다'}
@@ -349,6 +400,23 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           </CardContent>
         </Card>
 
+        {/* 지도 */}
+        {property.lat && property.lng && (
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-bold text-neutral-900">위치</h2>
+            </CardHeader>
+            <CardContent>
+              <KakaoMap
+                lat={property.lat}
+                lng={property.lng}
+                name={property.name}
+                className="h-[300px] w-full"
+              />
+            </CardContent>
+          </Card>
+        )}
+
         {/* AI 종합 리포트 섹션 */}
         <Card>
           <CardHeader>
@@ -419,7 +487,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 </div>
 
                 <div className="space-y-2">
-                  {[...EXPERT_TYPES, ...CONTENT_TYPES].map((type) => {
+                  {[...CONTENT_TYPES, ...EXPERT_TYPES].map((type) => {
                     const completed = analysisReports.some(r => r.analysis_type === type);
                     return (
                       <div
@@ -451,28 +519,28 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   <AnalysisRadar reports={analysisReports} />
                 </div>
 
-                {/* 전문가 분석 섹션 */}
+                {/* 뉴스 & 후기 종합 섹션 (먼저 표시) */}
                 <div>
                   <h3 className="text-base font-bold text-neutral-700 mb-4 flex items-center gap-2">
-                    <span className="inline-block w-1 h-4 bg-primary-600 rounded-full" />
-                    전문가 분석
+                    <span className="inline-block w-1 h-4 bg-amber-600 rounded-full" />
+                    뉴스와 후기는 이렇게 말하고 있어요
                   </h3>
                   <div className="space-y-4">
-                    {EXPERT_TYPES.map((type) => {
+                    {CONTENT_TYPES.map((type) => {
                       const report = analysisReports.find(r => r.analysis_type === type);
                       return report ? <AnalysisSection key={type} report={report} /> : null;
                     })}
                   </div>
                 </div>
 
-                {/* 뉴스 & 후기 종합 섹션 */}
+                {/* 전문가 분석 섹션 */}
                 <div>
                   <h3 className="text-base font-bold text-neutral-700 mb-4 flex items-center gap-2">
-                    <span className="inline-block w-1 h-4 bg-amber-600 rounded-full" />
-                    뉴스 & 후기 종합
+                    <span className="inline-block w-1 h-4 bg-primary-600 rounded-full" />
+                    전문가는 이렇게 해석해요
                   </h3>
                   <div className="space-y-4">
-                    {CONTENT_TYPES.map((type) => {
+                    {EXPERT_TYPES.map((type) => {
                       const report = analysisReports.find(r => r.analysis_type === type);
                       return report ? <AnalysisSection key={type} report={report} /> : null;
                     })}
