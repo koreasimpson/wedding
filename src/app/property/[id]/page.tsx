@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { AnalysisRadar } from '@/components/analysis/AnalysisRadar';
 import { AnalysisSection } from '@/components/analysis/AnalysisSection';
 import { ScoreBadge } from '@/components/analysis/ScoreBadge';
-import { KakaoMap } from '@/components/map/KakaoMap';
+import { NaverMap } from '@/components/map/NaverMap';
 import { ExternalLink, Loader2, RefreshCw, Sparkles, CheckCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -407,7 +407,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               <h2 className="text-lg font-bold text-neutral-900">위치</h2>
             </CardHeader>
             <CardContent>
-              <KakaoMap
+              <NaverMap
                 lat={property.lat}
                 lng={property.lng}
                 name={property.name}
