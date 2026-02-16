@@ -35,7 +35,7 @@ export function NaverMap({ lat, lng, name, className }: NaverMapProps) {
 
     // SDK 동적 로딩
     const script = document.createElement('script');
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}`;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}`;
     script.async = true;
 
     script.onload = () => {
