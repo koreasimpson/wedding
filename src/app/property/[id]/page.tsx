@@ -149,7 +149,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   // 분석이 완료되면 processing 상태 해제
   useEffect(() => {
-    if (analysisReports.length === 7) {
+    if (analysisReports.length >= 7) {
       setIsAnalysisProcessing(false);
     }
   }, [analysisReports]);
@@ -425,7 +425,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 <Sparkles className="h-5 w-5 text-primary-600" />
                 <h2 className="text-lg font-bold text-neutral-900">AI 종합 리포트</h2>
               </div>
-              {analysisReports.length === 7 && (
+              {analysisReports.length >= 7 && (
                 <div className="text-xs text-neutral-500">
                   {new Date(analysisReports[0]?.created_at || '').toLocaleDateString('ko-KR')} 분석
                 </div>
@@ -512,7 +512,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             )}
 
             {/* 완료 상태 */}
-            {analysisReports.length === 7 && (
+            {analysisReports.length >= 7 && (
               <div className="space-y-6">
                 {/* 레이더 차트 */}
                 <div className="pb-6 border-b border-neutral-200">
