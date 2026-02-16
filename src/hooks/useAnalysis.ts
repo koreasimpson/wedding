@@ -17,7 +17,16 @@ export function useAnalysis(propertyId: string) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data as AnalysisReport[]) || [];
+      const all = (data as AnalysisReport[]) || [];
+
+      // 분석 유형별 최신 1건만 반환 (재분석 시 중복 방지)
+      const latest = new Map<string, AnalysisReport>();
+      for (const report of all) {
+        if (!latest.has(report.analysis_type)) {
+          latest.set(report.analysis_type, report);
+        }
+      }
+      return Array.from(latest.values());
     },
   });
 }
